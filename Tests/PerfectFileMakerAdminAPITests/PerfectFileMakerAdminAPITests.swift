@@ -1,5 +1,8 @@
 import Testing
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 @testable import PerfectFileMakerAdminAPI
 
 // MARK: - URLProtocol mock (captures the outgoing request, returns a canned response)
@@ -85,8 +88,8 @@ struct FMAdminSessionAndClientTests {
         }
         let session = FMAdminSession()
         let urlSession = mockSession()
-        let first = try await session.getToken(host: "mock.example", port: 16000, username: "u", password: "p", urlSession: urlSession)
-        let second = try await session.getToken(host: "mock.example", port: 16000, username: "u", password: "p", urlSession: urlSession)
+        let first = try await session.getToken(host: "mock.example", port: 16000, username: "u", password: "p", transport: URLSessionTransport(session: urlSession))
+        let second = try await session.getToken(host: "mock.example", port: 16000, username: "u", password: "p", transport: URLSessionTransport(session: urlSession))
         #expect(first == "abc123")
         #expect(second == "abc123")
         #expect(counter.value == 1) // second call reused the cached token, no second login
@@ -100,9 +103,9 @@ struct FMAdminSessionAndClientTests {
         }
         let session = FMAdminSession()
         let urlSession = mockSession()
-        let first = try await session.getToken(host: "mock.example", port: 16000, username: "u", password: "p", urlSession: urlSession)
+        let first = try await session.getToken(host: "mock.example", port: 16000, username: "u", password: "p", transport: URLSessionTransport(session: urlSession))
         await session.invalidate()
-        let second = try await session.getToken(host: "mock.example", port: 16000, username: "u", password: "p", urlSession: urlSession)
+        let second = try await session.getToken(host: "mock.example", port: 16000, username: "u", password: "p", transport: URLSessionTransport(session: urlSession))
         #expect(first == "token-1")
         #expect(second == "token-2")
         #expect(counter.value == 2)
@@ -115,7 +118,7 @@ struct FMAdminSessionAndClientTests {
         }
         let session = FMAdminSession()
         await #expect(throws: FMAdminError.self) {
-            _ = try await session.getToken(host: "mock.example", port: 16000, username: "u", password: "p", urlSession: mockSession())
+            _ = try await session.getToken(host: "mock.example", port: 16000, username: "u", password: "p", transport: URLSessionTransport(session: mockSession()))
         }
     }
 

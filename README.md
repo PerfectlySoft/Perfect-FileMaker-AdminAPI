@@ -21,21 +21,25 @@ exhausting that cap.
 ## Requirements
 
 - Swift tools version **6.2**
-- **macOS 14.0 (Sonoma)** or later (`platforms: [.macOS(.v14)]`) — no iOS or
+- **macOS 12.0** or later (`platforms: [.macOS(.v12)]`) — no iOS or
   other platform is currently declared
-- **Linux**: builds, with one exception — `FMAdminInsecureTLSDelegate` (see
-  below) is Darwin-only, since it depends on Security-framework primitives
-  (`SecTrust`/`SecIdentity`) that `swift-corelibs-foundation` doesn't
-  implement on Linux. A Linux deployment against a self-signed FileMaker
-  Server certificate needs to install that certificate into the system CA
-  trust store instead of using the bypass delegate.
+- **Linux**: builds. `FMAdminInsecureTLSDelegate` (see below) is Darwin-only,
+  since it depends on Security-framework primitives (`SecTrust`/`SecIdentity`)
+  that `swift-corelibs-foundation` doesn't implement on Linux. The supported
+  production path on Linux is still to install the server's certificate into
+  the system CA trust store. For local dev/test against a self-signed
+  FileMaker Server, `FMAdminInsecureLinuxTransport` (see below) provides a
+  Linux equivalent — pinned to one certificate you supply, rather than
+  trusting any certificate the way the Darwin delegate does.
 
 ## Dependencies
 
-None. `Package.swift` declares no `dependencies:` array — this is a leaf
-package with zero external or in-ecosystem dependencies. It uses only
-Foundation / FoundationNetworking and `URLSession` directly, with no
-third-party HTTP or JSON layer.
+None on Darwin. `Package.swift`'s `dependencies:` array lists
+`async-http-client`, `swift-nio`, and `swift-nio-ssl`, but they're wired into
+the target only via `condition: .when(platforms: [.linux])` — they back
+`FMAdminInsecureLinuxTransport` and are never compiled into macOS builds.
+Everything else uses Foundation / FoundationNetworking and `URLSession`
+directly, with no third-party HTTP or JSON layer.
 
 It is also deliberately independent of, and has zero dependency on,
 `Perfect-FileMaker` (the classic XML CWP client) or
@@ -65,6 +69,15 @@ session management can pull in just this package.
   `URLSessionDelegate` conformance has its own thread-safety contract
   independent of Swift's `Sendable` checking. Opt-in only; never the default.
   **Darwin-only** (see Requirements above).
+- **`FMAdminInsecureLinuxTransport`** — **Linux-only**, the Linux equivalent
+  of `FMAdminInsecureTLSDelegate` above. Backed by AsyncHTTPClient/NIOSSL
+  rather than `URLSession`, since Linux has no `SecTrust` to build a
+  `URLSessionDelegate`-based bypass on. Pins trust to one PEM certificate —
+  passed explicitly via `pinnedCertificatePath:`, or read from the
+  `FMADMIN_INSECURE_CERT_PATH` environment variable — rather than trusting
+  any certificate; a MITM presenting a different certificate still fails.
+  Use via `FMAdminClient.insecureLinux(host:port:username:password:pinnedCertificatePath:)`.
+  Logs a warning to stderr on construction. Opt-in only; never the default.
 
 ### CWP Session Janitor (policy layer)
 
@@ -107,10 +120,31 @@ await CWPSessionJanitor.sweep(
 )
 ```
 
-For local development against a self-signed FileMaker Server certificate,
-pass a `URLSession` configured with `FMAdminInsecureTLSDelegate` into
-`FMAdminClient`'s `urlSession` parameter — this should never be used against
-a production server with a real certificate.
+For local development against a self-signed FileMaker Server certificate on
+**Darwin**, pass a `URLSession` configured with `FMAdminInsecureTLSDelegate`
+into `FMAdminClient`'s `urlSession` parameter — this should never be used
+against a production server with a real certificate.
+
+On **Linux**, export the dev/test server's certificate once —
+
+```bash
+openssl s_client -connect filemaker.dev.example:16000 -showcerts </dev/null \
+    2>/dev/null | openssl x509 -outform PEM > fm-dev-server.pem
+```
+
+— then either pass its path explicitly or set `FMADMIN_INSECURE_CERT_PATH`:
+
+```swift
+let client = try FMAdminClient.insecureLinux(
+    host: "filemaker.dev.example",
+    username: "admin",
+    password: "••••••••",
+    pinnedCertificatePath: "fm-dev-server.pem"
+)
+```
+
+This pins trust to that one certificate rather than trusting any certificate
+— never use it against a production server either.
 
 ## License
 
