@@ -20,7 +20,7 @@ public struct FMAdminClient: Sendable {
     let username: String
     let password: String
     let session: FMAdminSession
-    let urlSession: URLSession
+    let transport: any FMAdminTransport
 
     /// - Parameters:
     ///   - host: FileMaker Server hostname or IP address.
@@ -31,12 +31,22 @@ public struct FMAdminClient: Sendable {
     ///   - urlSession: Custom URLSession for certificate pinning or testing. Defaults to `.shared`.
     public init(host: String, port: Int = 16000, username: String, password: String,
                 urlSession: URLSession = .shared) {
+        self.init(host: host, port: port, username: username, password: password,
+                   transport: URLSessionTransport(session: urlSession))
+    }
+
+    /// Same as the `urlSession:` initializer, but accepts any `FMAdminTransport`
+    /// — e.g. `FMAdminInsecureLinuxTransport` on Linux, where there is no
+    /// `URLSession`-based equivalent of a pinned/insecure TLS delegate. Most
+    /// callers want the `urlSession:` initializer instead.
+    init(host: String, port: Int = 16000, username: String, password: String,
+         transport: any FMAdminTransport) {
         self.host = host
         self.port = port
         self.username = username
         self.password = password
         self.session = FMAdminSession()
-        self.urlSession = urlSession
+        self.transport = transport
     }
 
     /// Returns every currently connected client — all types (CWP, Pro, Go,
@@ -65,7 +75,7 @@ public struct FMAdminClient: Sendable {
 
     private func token() async throws -> String {
         try await session.getToken(host: host, port: port, username: username, password: password,
-                                    urlSession: urlSession)
+                                    transport: transport)
     }
 
     private func request(method: String, path: String) async throws -> Data {
@@ -73,7 +83,7 @@ public struct FMAdminClient: Sendable {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("Bearer \(try await token())", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await urlSession.data(for: req)
+        let (data, response) = try await transport.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw FMAdminError.invalidResponse }
         if http.statusCode == 401 || http.statusCode == 403 {
             await session.invalidate()

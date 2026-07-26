@@ -20,11 +20,11 @@ actor FMAdminSession {
     func invalidate() { token = nil }
 
     func getToken(host: String, port: Int, username: String, password: String,
-                  urlSession: URLSession) async throws -> String {
+                  transport: any FMAdminTransport) async throws -> String {
         if let token { return token }
         let newToken = try await Self.login(
             host: host, port: port, username: username, password: password,
-            urlSession: urlSession
+            transport: transport
         )
         self.token = newToken
         return newToken
@@ -34,7 +34,7 @@ actor FMAdminSession {
     // unlike the classic XML CWP client, there's no plain-HTTP fallback to
     // consider here.
     private static func login(host: String, port: Int, username: String, password: String,
-                               urlSession: URLSession) async throws -> String {
+                               transport: any FMAdminTransport) async throws -> String {
         guard let url = URL(string: "https://\(host):\(port)/fmi/admin/api/v2/user/auth") else {
             throw FMAdminError.invalidResponse
         }
@@ -44,7 +44,7 @@ actor FMAdminSession {
         let credentials = Data("\(username):\(password)".utf8).base64EncodedString()
         request.setValue("Basic \(credentials)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await urlSession.data(for: request)
+        let (data, response) = try await transport.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw FMAdminError.authenticationFailed
         }

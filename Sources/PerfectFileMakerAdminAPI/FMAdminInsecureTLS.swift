@@ -6,10 +6,12 @@ import FoundationNetworking
 // Darwin-only: relies on `URLProtectionSpace.serverTrust`/`URLCredential(trust:)`,
 // which need the Security framework's SecTrust/SecIdentity primitives. Those are
 // not implemented in swift-corelibs-foundation on Linux (still open upstream as of
-// swiftlang/swift-corelibs-foundation#5157), so there is no equivalent to swap in —
-// this escape hatch simply doesn't exist on Linux. A Linux deployment against a
-// self-signed FileMaker Server must install that server's certificate into the
-// system CA trust store instead.
+// swiftlang/swift-corelibs-foundation#5157), so there is no `URLSession`-based
+// equivalent to swap in on Linux. See `FMAdminInsecureLinuxTransport` in
+// FMAdminInsecureLinuxTransport.swift for the Linux dev/test path (pinned to a
+// caller-supplied certificate, not a trust-anything bypass); the supported
+// production path on Linux remains installing the server's certificate into the
+// system CA trust store.
 #if canImport(Security)
 
 /// Accepts ANY server TLS certificate unconditionally, including self-signed
