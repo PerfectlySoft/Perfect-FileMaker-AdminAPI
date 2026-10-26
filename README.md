@@ -1,29 +1,27 @@
-# Perfect-FileMaker-AdminAPI
+# Perfect FileMaker Admin API
 
-A Swift client for the FileMaker Server Admin API (v2) — lists connected
-clients and force-disconnects them — plus a policy layer on top, the **CWP
-Session Janitor**, that periodically sweeps and disconnects stale/excess
-Custom Web Publishing sessions to keep FileMaker Server under its licensed
-concurrent-connection cap.
+<p align="center">
+    <img src="https://img.shields.io/badge/Swift-6.2%2B-orange.svg?style=flat" alt="Swift 6.2+">
+    <img src="https://img.shields.io/badge/Platforms-macOS%2012%2B%20%7C%20Linux-lightgray.svg?style=flat" alt="Platforms macOS 12+ | Linux">
+    <a href="LICENSE" target="_blank">
+        <img src="https://img.shields.io/badge/License-Apache%202.0-lightgrey.svg?style=flat" alt="License Apache 2.0">
+    </a>
+</p>
 
-## Status: core dependency
+A Swift client for the FileMaker Server Admin API (v2), which lists connected clients and
+force-disconnects them. On top of it sits a policy layer, the **CWP Session Janitor**, that
+periodically finds stale or excess Custom Web Publishing sessions and disconnects them to keep
+FileMaker Server under its licensed concurrent-connection cap.
 
-This is **not** a staged or future-integration package. It is depended on
-directly by Perfect-Lasso — a Swift reimplementation of the Lasso language,
-still in active development and not yet production-ready — which runs the
-CWP Session Janitor as a background task against a real, live FileMaker
-Server during validation testing. It is confirmed working end-to-end
-against that real server: FileMaker Server is licensed for a maximum of
-200 concurrent connections, and the Janitor is what keeps stuck/orphaned
-CWP sessions from
-exhausting that cap.
+The Janitor has been run against a live FileMaker Server, where stuck CWP sessions would otherwise
+use up the server's connection cap (200 on the server it was tested against).
 
 ## Requirements
 
-- Swift tools version **6.2**
-- **macOS 12.0** or later (`platforms: [.macOS(.v12)]`) — no iOS or
-  other platform is currently declared
-- **Linux**: builds. `FMAdminInsecureTLSDelegate` (see below) is Darwin-only,
+- Swift 6.2 or later (`swift-tools-version: 6.2`, Swift 6 language mode).
+- macOS 12 or later, or Linux. CI covers Swift 6.2 and 6.4 on Ubuntu 24.04 and Xcode 26.0.1 and
+  26.6 on macOS, in debug and release, with warnings as errors.
+- `FMAdminInsecureTLSDelegate` (see below) is Darwin-only,
   since it depends on Security-framework primitives (`SecTrust`/`SecIdentity`)
   that `swift-corelibs-foundation` doesn't implement on Linux. The supported
   production path on Linux is still to install the server's certificate into
@@ -42,9 +40,19 @@ Everything else uses Foundation / FoundationNetworking and `URLSession`
 directly, with no third-party HTTP or JSON layer.
 
 It is also deliberately independent of, and has zero dependency on,
-`Perfect-FileMaker` (the classic XML CWP client) or
-`Perfect-FileMaker-DataAPI` — a consumer that only needs FileMaker Server
+[Perfect-FileMaker](https://github.com/PerfectlySoft/Perfect-FileMaker) (the classic XML CWP client) or
+[Perfect-FileMaker-DataAPI](https://github.com/PerfectlySoft/Perfect-FileMaker-DataAPI). A consumer that only needs FileMaker Server
 session management can pull in just this package.
+
+## Using in your project
+
+```swift
+.package(url: "https://github.com/PerfectlySoft/Perfect-FileMaker-AdminAPI.git", from: "1.0.0"),
+```
+
+```swift
+.product(name: "PerfectFileMakerAdminAPI", package: "Perfect-FileMaker-AdminAPI"),
+```
 
 ## What's here
 
@@ -148,4 +156,4 @@ This pins trust to that one certificate rather than trusting any certificate
 
 ## License
 
-Not yet specified.
+Apache 2.0. See [LICENSE](LICENSE).
